@@ -1,34 +1,70 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using TMPro;
+using Unity.VisualScripting;
 
 public class PlayerController : MonoBehaviour
 {
-    public float speed = 0;
+    public float MoveSpeed = 0;
     public TextMeshProUGUI countText;
     public GameObject winTextObject;
 
     private int count;
     private Rigidbody rb;
-    private float movementX;
-    private float movementY;
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
-    void Start()
+    public InputActionAsset InputActions;
+
+    private InputAction moveAction;
+    private Vector2 movementVector;
+
+    private void OnEnable()
+    {
+        InputActions.FindActionMap("Player").Enable();
+
+        moveAction = InputActions.FindAction("Move");
+        moveAction.Enable();
+    }
+
+    private void OnDisable()
+    {
+        InputActions.FindActionMap("Player").Disable();
+    }
+
+    private void Awake()
     {
         rb = GetComponent<Rigidbody>();
+
         count = 0;
 
         SetCountText();
         winTextObject.SetActive(false);
     }
 
-    void OnMove (InputValue movementValue)
+    private void Update()
     {
-        Vector2 movementVector = movementValue.Get<Vector2>();
+        movementVector = moveAction.ReadValue<Vector2>();
+    }
 
-        movementX = movementVector.x;
-        movementY = movementVector.y;
+    private void FixedUpdate()
+    {
+        RollingMovementWithDamping();
+    }
+
+    private void RollingMovementWithDamping()
+    {
+        Vector3 movementDirection = new Vector3(movementVector.x, 0.0f, movementVector.y);
+        rb.AddForce(movementDirection * MoveSpeed, ForceMode.Force);
+        Vector3 rollingTorque = Vector3.Cross(Vector3.up, movementDirection);
+        rb.AddTorque(rollingTorque * MoveSpeed * 10f, ForceMode.Force);
+
+        if (movementVector.magnitude == 0)
+        {
+            float dampingFactor = 5f;
+            rb.AddForce(-rb.linearVelocity * dampingFactor, ForceMode.Force);
+
+            float angularDampingFactor = 2f;
+            rb.AddTorque(-rb.angularVelocity * angularDampingFactor, ForceMode.Force);
+        }
     }
 
     void SetCountText()
@@ -41,13 +77,6 @@ public class PlayerController : MonoBehaviour
 
             Destroy(GameObject.FindGameObjectWithTag("Enemy"));
         }
-    }
-
-    private void FixedUpdate()
-    {
-        Vector3 movement = new Vector3(movementX, 0.0f, movementY);
-
-        rb.AddForce(movement * speed);
     }
 
     private void OnCollisionEnter(Collision collision)
